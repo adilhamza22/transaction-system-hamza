@@ -1,5 +1,5 @@
 const uuid = require('uuid');
-const randomString1 = uuid.v4().substring(0, 12);
+// const randomString1 = uuid.v4().substring(0, 12);
 
 // console.log(randomString1);
 
@@ -154,12 +154,13 @@ async function getCurrency (user_name){
     let currency = currencies.find(item => item.code == currency_code);
     return currency;
 };
-
+var tranSuccess;
 //perform intermediary calculations
 async function performCalculation (sender_name, receiver_name, amount ,findRate,getCurr){
-    debugger
+    var receiptObject = {};
+    tranSuccess= false;
     let senderCurr = await getCurr(sender_name);
-    console.log(senderCurr,"senderCurr");
+    // console.log(senderCurr,"senderCurr");
     let sender = users.find(item => item.name == sender_name);
     if(!sender){
         console.log("Sender not found")
@@ -186,9 +187,13 @@ async function performCalculation (sender_name, receiver_name, amount ,findRate,
         console.log("Sender currency details not found");
         return;
     }
+    if(amount<=0){
+        console.log("Invalid amount");
+        return;
+    }
     let transactionObject = {};
-    transactionObject.sender_id = senderID;
-    transactionObject.receiver_id = receiverID;
+    transactionObject.sender_id = sender.reference;
+    transactionObject.receiver_id = receiver.reference;
     transactionObject.amount = amount;
     transactionObject.currency = senderCurrencyObj.currency;
     transactionObject.transaction_id = uuid.v4().substring(0, 12);
@@ -197,22 +202,47 @@ async function performCalculation (sender_name, receiver_name, amount ,findRate,
         transactionObject.fee_in_amount = 0;
     }
     else{
-        console.log(senderCurr.code,recvCurr.code, typeof senderCurr.code, typeof recvCurr.code);
         let convRate = await findRate(senderCurr.currency,recvCurr.currency);
-        console.log(convRate,"convRate");
         if(!convRate){
             console.log("Invalid Currency Code, try again");
         }
         transactionObject.fee_in_amount = Number(convRate) * Number(amount);
         // transactionObject.exchange_rate_fee = await applyConversionRate(amount,)
     }
-    console.log(transactionObject);
+    console.log("Current Transaction in Process:",transactionObject);
     let balance = await checkBalance(sender_name);
-    if(transactionObject.amount + transactionObject.fee_in_amount > balance ){
+    if(transactionObject.exchange_rate_fee + transactionObject.amount + transactionObject.fee_in_amount > balance ){
         console.log("Insufficient Balance");
         return;
     }
-    transactions.push(transactionObject);//but first check balance
+    else{
+        //push new amount in receiver account
+        users.forEach((item,index) => {
+            if(item.name == sender_name){
+                item.bankDetails[0].balance =item.bankDetails[0].balance - (transactionObject.exchange_rate_fee + transactionObject.amount + transactionObject.fee_in_amount);
+            }
+            if(item.name == receiver_name){
+                item.bankDetails[0].balance = item.bankDetails[0].balance + transactionObject.amount*transactionObject.fee_in_amount;
+            }
+                receiptObject.sender_id = sender.reference;
+                receiptObject.SenderName = sender.name;
+                receiptObject.bankDetails = sender.bankDetails;
+                receiptObject.receiver_id = receiver.reference;
+                receiptObject.ReceiverName = receiver.name;
+                receiptObject.transferredAmount = transactionObject.amount;
+                receiptObject.exchange_rate_fee = transactionObject.exchange_rate_fee;
+                receiptObject.ConversionFees = transactionObject.fee_in_amount;
+                receiptObject.transaction_id = transactionObject.transaction_id;
+                receiptObject.SenderCurrency = transactionObject.currency;
+                receiptObject.SenderBalance = item.bankDetails[0].balance;
+                receiptObject.ReceiverCurrency = recvCurr.currency;
+                receiptObject.receiverBalance = receiver.bankDetails[0].balance;
+                tranSuccess =true;
+        });
+        console.table(receiptObject);
+
+    }
+    transactions.push(transactionObject);
 };
 async function applyExchangeRate  (amount, exchange_rate) {
     return amount = amount - exchange_rate;
@@ -220,32 +250,7 @@ async function applyExchangeRate  (amount, exchange_rate) {
 async function applyConversionRate (amount, conversionRate){
     return amount = amount * conversionRate;
 }
-// getCurrency("John").then((currency) => {console.table(currency)}).catch((err) => {console.log(err)});
-// performCalculation("Mango", "Alice", getTransferDetails, getCurrency).then((currency) => {console.table(currency)}).catch((err) => {console.log(err)});
 
-// let y = JSON.parse(conversionRates);
-for(x of conversionRates){
-    console.table(x);
-}
-// Object.entries(conversionRates);
-//  for (let x in conversionRates){
-//     //  console.log(Object.entries(conversionRates[x]));
-//     //  console.log(Object.entries(conversionRates[0]).find(([key, value]) => key === "USD"));
-//     if(Object.entries(conversionRates[x]).find(([key, value]) => key === "USD")){
-//         console.log("found",value);
-//     }
-// }
-// console.log(Object.entries(conversionRates[0]).find((key, value) => key === "USD"));
-// Object.entries(conversionRates[0]).find(([key, value]) => {
-//     if(key == "USD"){       
-//         console.log("found");
-//         value.forEach( (element,index) => {
-//             if(value[index].hasOwnProperty("EUR")){
-//             console.log(element["EUR"],index);
-//         }
-//         })
-//     }
-// })
 
 
 async function checkBalance(sender_name){
@@ -280,7 +285,14 @@ function findConversionRate(sCurrCode,rCurrCode){
     return ans;
 }
 
-
-// let ans = findConversionRate("USD","AUD");
-// console.log(ans);
-performCalculation("Alice","Bob",10000,findConversionRate,getCurrency).then((value) => {console.table(value)}).catch((err) => {console.log(err)});
+setTimeout(()=>{
+        performCalculation("Alice","Bob",70,findConversionRate,getCurrency);
+        if(tranSuccess==true){
+            setTimeout(()=>{
+                console.log("Transaction Successful!");
+                console.table(transactions);
+            },3000);
+        }
+    
+},3000);
+console.log("Transaction in Process . . . ");
