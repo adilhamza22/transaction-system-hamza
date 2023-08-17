@@ -162,6 +162,10 @@ async function performCalculation (sender_name, receiver_name, amount ,findRate,
     let senderCurr = await getCurr(sender_name);
     // console.log(senderCurr,"senderCurr");
     let sender = users.find(item => item.name == sender_name);
+    if(sender_name == receiver_name){
+        console.log("Sender and Receiver Should be Different!");
+        return;
+    }
     if(!sender){
         console.log("Sender not found")
         return;
@@ -286,7 +290,7 @@ function findConversionRate(sCurrCode,rCurrCode){
 }
 
 setTimeout(()=>{
-        performCalculation("Alice","Bob",70,findConversionRate,getCurrency);
+        performCalculation("Alice","Alice",700,findConversionRate,getCurrency);
         if(tranSuccess==true){
             setTimeout(()=>{
                 console.log("Transaction Successful!");
